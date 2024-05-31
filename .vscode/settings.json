@@ -1,0 +1,12 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/eric/workspace/lidar_ins/GRIL_ws/devel/lib/python3/dist-packages",
+        "/home/eric/workspace/shared_msg_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/eric/workspace/lidar_ins/GRIL_ws/devel/lib/python3/dist-packages",
+        "/home/eric/workspace/shared_msg_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ]
+}
