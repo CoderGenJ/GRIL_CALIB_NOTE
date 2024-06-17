@@ -105,6 +105,7 @@ struct CalibState {
   };
 };
 
+//角度cost: 雷达角速度通过外参转换后和IMU角速度得差值作为角速度得残差
 struct Angular_Vel_Cost_only_Rot {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -134,6 +135,10 @@ struct Angular_Vel_Cost_only_Rot {
   V3D Lidar_ang_vel;
 };
 
+//角速度约束:
+//约束状态量:旋转bias/外参R/时间差t(imu相对于lidar)
+//约束本质:雷达的角速度向量通过外参转换到IMU和IMU的角速度进行求差
+// IMU角速度= IMU角速度的测量值+角加速度 * 时间差 + bias_g
 struct Angular_Vel_IL_Cost {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -181,10 +186,15 @@ struct Angular_Vel_IL_Cost {
   V3D Lidar_ang_vel;
   double deltaT_LI;
 };
-
+//地平面约束:主要约束外参的平移Z,以及旋转roll/pitch有约束,3自由度约束,对于yaw角度没有
+// XY没有约束
 struct Ground_Plane_Cost_IL {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
+  //构建地平面约束
+  // Lidar_wrt_ground_: T_world_lidar中得旋转
+  // IMU_wrt_ground_: T_world_imu
+  // distance_Lidar_wrt_ground_:雷达到地面高度,通过地平面分割后点云求解出平面方程得到
+  // imu_sensor_height_ :根据测量先验而来
   Ground_Plane_Cost_IL(QD Lidar_wrt_ground_, QD IMU_wrt_ground_,
                        const double distance_Lidar_wrt_ground_,
                        const double imu_sensor_height_)
@@ -194,7 +204,9 @@ struct Ground_Plane_Cost_IL {
 
   template <typename T>
   bool operator()(const T *q, const T *trans, T *residual) const {
+    //这种普通变量转换为模板得方法比较简约
     // Known parameters used for Residual Construction
+    // 1. 变量模板化
     Eigen::Quaternion<T> Lidar_wrt_ground_T =
         Lidar_wrt_ground.cast<T>(); // from ground frame to LiDAR plane frame
     Eigen::Matrix<T, 3, 3> R_GL =
@@ -220,10 +232,14 @@ struct Ground_Plane_Cost_IL {
                                 trans[2]}; // Translation of I-L (IMU wtr Lidar)
 
     // Plane motion constraint Residual
+    // 2.旋转约束建立:   R_lidar_I * R_I_g * R_g_lidar * (0,0,1)
+    // 即: 雷达到地面得旋转和IMU到地面得旋转得到得雷达-imu外参 和
+    // 待估计得有误差得雷达-imu外参得逆 *(0,0,1) 转换为前两趋近于0
     Eigen::Matrix<T, 3, 3> R_plane = R_IL.transpose() * R_GI.transpose() * R_GL;
     Eigen::Matrix<T, 3, 1> e3 = Eigen::Matrix<T, 3, 1>::UnitZ(); // (0,0,1)
     Eigen::Matrix<T, 3, 1> resi_plane = R_plane * e3;
 
+    // 3.高度约束:不太理解...
     // Distance constraint Residual - TODO : Generalized
     Eigen::Matrix<T, 3, 1> imu_height_vec = imu_sensor_height_T * e3;
     Eigen::Matrix<T, 3, 1> lidar_height_vec = distance_Lidar_wrt_ground_T * e3;
@@ -257,6 +273,7 @@ struct Ground_Plane_Cost_IL {
   double imu_sensor_height;
 };
 
+//这是加速度约束,不太理解
 struct Linear_acc_Rot_Cost_without_Gravity {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 

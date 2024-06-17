@@ -29,6 +29,10 @@ Eigen::Matrix<T, 3, 3> Exp(const Eigen::Matrix<T, 3, 1> &ang) {
   }
 }
 
+// IMU角速度和时间->旋转矩阵
+// 角速度->角轴
+// 角速度*时间->角度
+// 角度+角轴->旋转矩阵
 template <typename T, typename Ts>
 Eigen::Matrix<T, 3, 3> Exp(const Eigen::Matrix<T, 3, 1> &ang_vel,
                            const Ts &dt) {
@@ -36,11 +40,12 @@ Eigen::Matrix<T, 3, 3> Exp(const Eigen::Matrix<T, 3, 1> &ang_vel,
   Eigen::Matrix<T, 3, 3> Eye3 = Eigen::Matrix<T, 3, 3>::Identity();
 
   if (ang_vel_norm > 0.0000001) {
+    //角速度->角轴->李代数
     Eigen::Matrix<T, 3, 1> r_axis = ang_vel / ang_vel_norm;
     Eigen::Matrix<T, 3, 3> K;
-
+    //李代数->旋转矩阵
     K << SKEW_SYM_MATRX(r_axis);
-
+    // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
     T r_ang = ang_vel_norm * dt;
 
     /// Roderigous Tranformation
@@ -82,6 +87,7 @@ Eigen::Matrix<T, 3, 3> A_cal(const Eigen::Matrix<T, 3, 1> &ang_vel) {
 }
 
 /* Logrithm of a Rotation Matrix */
+//旋转矩阵对数映射
 template <typename T>
 Eigen::Matrix<T, 3, 1> Log(const Eigen::Matrix<T, 3, 3> &R) {
   T theta = (R.trace() > 3.0 - 1e-6) ? 0.0 : std::acos(0.5 * (R.trace() - 1));

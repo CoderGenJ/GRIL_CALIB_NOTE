@@ -170,16 +170,15 @@ struct StatesGroup {
     this->vel_end = Zero3d;
   }
 
-  M3D rot_end; // the estimated attitude (rotation matrix) at the end lidar
-               // point
-  V3D pos_end; // the estimated position at the end lidar point (world frame)
+  M3D rot_end; // 雷达帧尾时刻的位置的旋转
+  V3D pos_end; // 雷达帧尾时刻的位置 (world frame)
   M3D offset_R_L_I; // Rotation from Lidar frame L to IMU frame I
   V3D offset_T_L_I; // Translation from Lidar frame L to IMU frame I (from IMU
                     // to LiDAR)
-  V3D vel_end; // the estimated velocity at the end lidar point (world frame)
-  V3D bias_g;  // gyroscope bias
-  V3D bias_a;  // accelerator bias
-  V3D gravity; // the estimated gravity acceleration
+  V3D vel_end; // 雷达帧尾时刻的速度 (world frame)
+  V3D bias_g;  // 角速度偏差
+  V3D bias_a;  // 加速度偏差
+  V3D gravity; // 在重力方向
   Matrix<double, DIM_STATE, DIM_STATE> cov; // states covariance
 };
 

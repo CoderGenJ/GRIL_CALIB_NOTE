@@ -140,11 +140,15 @@ void ImuProcess::set_mean_acc_norm(const double &mean_acc_norm) {
 void ImuProcess::set_gyr_bias_cov(const V3D &b_g) { cov_bias_gyr = b_g; }
 
 void ImuProcess::set_acc_bias_cov(const V3D &b_a) { cov_bias_acc = b_a; }
-
+//本函数为:IMU初始化,即通过静止的IMU测量数据,对于IMU的重力方向,角速度偏差和角速度的协方差进行初步估计
+// 1.重力方向估计是归一化加速度向量,然后反向,然后将莫长编成9.81
+// 2.角速度偏差:直接设置为0,正常而言,是平均角速度,参考FAST-LIO2中对应代码,估计测量数据也比较小,设置为0影响不大?
+// 3.测量数据的协方差,加速度角速度
 void ImuProcess::IMU_init(const MeasureGroup &meas, StatesGroup &state_inout,
                           int &N) {
   /** 1. initializing the gravity, gyro bias, acc and gyro covariance
    ** 2. normalize the acceleration measurements to unit gravity **/
+
   ROS_INFO("IMU Initializing: %.1f %%", double(N) / MAX_INI_COUNT * 100);
   V3D cur_acc, cur_gyr;
 
@@ -159,6 +163,7 @@ void ImuProcess::IMU_init(const MeasureGroup &meas, StatesGroup &state_inout,
     first_lidar_time = meas.lidar_beg_time;
   }
 
+  //在线（增量）算法，用于更新加速度计读数的协方差矩阵。该算法允许你在接收新测量值时更新协方差矩阵，而无需存储所有以前的测量值。
   for (const auto &imu : meas.imu) {
     const auto &imu_acc = imu->linear_acceleration;
     const auto &gyr_acc = imu->angular_velocity;
@@ -177,13 +182,16 @@ void ImuProcess::IMU_init(const MeasureGroup &meas, StatesGroup &state_inout,
 
     N++;
   }
-
+  //归一化后的 mean_acc 向量方向反转，并乘以重力加速度常数
+  // G_m_s2。这实际上是将加速度计测量值的平均方向调整为重力方向，且将其大小设置为标准重力加速度。这段代码的目的是得到一个矢量，该矢量方向与重力方向相反，大小为
+  // G_m_s2
   state_inout.gravity = -mean_acc / mean_acc.norm() * G_m_s2;
   state_inout.rot_end = Eye3d;
   state_inout.bias_g.setZero();
   last_imu_ = meas.imu.back();
 }
 
+//
 void ImuProcess::Forward_propagation_without_imu(const MeasureGroup &meas,
                                                  StatesGroup &state_inout,
                                                  PointCloudXYZI &pcl_out) {
@@ -208,6 +216,7 @@ void ImuProcess::Forward_propagation_without_imu(const MeasureGroup &meas,
   /* covariance propagation */
   F_x.setIdentity();
   cov_w.setZero();
+  // CV model:匀速模型
   /** In CV model, bias_g represents angular velocity **/
   /** In CV model，bias_a represents linear acceleration **/
   M3D Exp_f = Exp(state_inout.bias_g, dt);

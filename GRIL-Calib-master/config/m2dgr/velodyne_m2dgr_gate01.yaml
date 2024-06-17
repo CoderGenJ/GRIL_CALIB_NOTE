@@ -4,6 +4,9 @@ common:
     lid_topic:  "/pxt32_3/pandar_points"
     imu_topic:  "/msf/raw_imu" 
 
+    # lid_topic:  "/velodyne_points"
+    # imu_topic:  "/handsfree/imu" 
+
 preprocess:
     lidar_type: 2                # Velodyne LiDAR
     scan_line: 32                # LiDAR scan line number
@@ -16,7 +19,7 @@ calibration:
     orig_odom_freq: 10           # original Lidar frequency (for velodyne, it is 10Hz)
     mean_acc_norm: 9.81          # 1: for livox built-in IMU
 
-    imu_sensor_height : 0.73      # Height from ground to IMU sensor (meter)
+    imu_sensor_height : 0.59      # Height from ground to IMU sensor (meter)
     verbose : true               # For debug, Rotation matrix related ground, lidar sensor height
 
     # For Data Accumulation
@@ -26,9 +29,9 @@ calibration:
     z_accumulate : 0.99            # Parameter that determines how much the z-axis rotates (0.0 ~ 0.999)
 
     # initial guess for translation vector (from IMU frame I to LiDAR frame L) - unit : m
-    trans_IL_x : -0.6 
-    trans_IL_y : -0.45 
-    trans_IL_z : -0.6 
+    trans_IL_x : -9.2
+    trans_IL_y : -0.608
+    trans_IL_z : 0.808
     set_boundary : false
     bound_th : 0.3
 
@@ -67,7 +70,7 @@ patchworkpp:
     sensor_height: 0.85        # For M2DGR dataset : https://github.com/SJTU-ViSYS/M2DGR
 
     mode: "czm" 
-    verbose: false   # To check effect of uprightness/elevation/flatness
+    verbose: true   # To check effect of uprightness/elevation/flatness
     visualize: true  # Ground Likelihood Estimation is visualized
     
     # Ground Plane Fitting parameters
@@ -82,7 +85,7 @@ patchworkpp:
     min_r: 1.0              # min_range of ground estimation area
     uprightness_thr: 0.707  # threshold of uprightness using in Ground Likelihood Estimation(GLE). Please refer paper for more information about GLE.
 
-    adaptive_seed_selection_margin: -1.2 # The points below the adaptive_seed_selection_margin * sensor_height are filtered
+    adaptive_seed_selection_margin: -1.5 # The points below the adaptive_seed_selection_margin * sensor_height are filtered
     czm:
         num_zones: 4
         num_sectors_each_zone: [16, 32, 54, 32]

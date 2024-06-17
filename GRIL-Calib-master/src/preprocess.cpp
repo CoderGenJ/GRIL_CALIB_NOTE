@@ -48,6 +48,7 @@ void Preprocess::process(const livox_ros_driver::CustomMsg::ConstPtr &msg,
   *pcl_out = pl_surf;
 }
 
+//
 void Preprocess::process_cut_frame_livox(
     const livox_ros_driver::CustomMsg::ConstPtr &msg,
     deque<PointCloudXYZI::Ptr> &pcl_out, deque<double> &time_lidar,
@@ -118,6 +119,13 @@ void Preprocess::process_cut_frame_livox(
     }
   }
 }
+///本函数是点云预处理的函数:
+///主要包含:1.点云的时间求解 2.近处点,nan值删除 3.点云切片
+/// msg:待处理的msg
+/// pcl_out:输出的点云时间片序列
+/// time_lidar: 记录时间片的起点时间
+/// required_frame_num:需要被切的时间片个数
+/// scan_count:扫描帧计数器
 #define MAX_LINE_NUM 128
 void Preprocess::process_cut_frame_pcl2(
     const sensor_msgs::PointCloud2::ConstPtr &msg,
@@ -147,17 +155,22 @@ void Preprocess::process_cut_frame_pcl2(
     //     memset(is_first, true, sizeof(is_first));
     // }
 
+    //计算扫描角yaw的范围:原理计算同一个ring上首尾两个点的yaw角差
+    // 1.yaw的计算: atan(y,x)
+    // 2.同一个ring的首尾两个点,分别计算yaw
     if (pl_orig.points[plsize - 1].time > 0 && pl_orig.points[0].time > 0) {
       cout << "Use given offset time." << endl;
       given_offset_time = true;
     } else {
-      // cout << "Compute offset time using constant rotation model." << endl;
+      cout << "Compute offset time using constant rotation model." << endl;
       given_offset_time = false;
       memset(is_first, true, sizeof(is_first));
+      // 57.2957 = 180/Pi
       double yaw_first =
           atan2(pl_orig.points[0].y, pl_orig.points[0].x) * 57.29578;
       double yaw_end = yaw_first;
       int layer_first = pl_orig.points[0].ring;
+      //逆序遍历到同一个ring,以此来找到同一个ring的尾部点
       for (uint i = plsize - 1; i > 0; i--) {
         if (pl_orig.points[i].ring == layer_first) {
           yaw_end = atan2(pl_orig.points[i].y, pl_orig.points[i].x) * 57.29578;
@@ -179,10 +192,11 @@ void Preprocess::process_cut_frame_pcl2(
 
       double dist = added_pt.x * added_pt.x + added_pt.y * added_pt.y +
                     added_pt.z * added_pt.z;
+      // 1.滤除blind范围内的点,过近的点
       if (dist < blind * blind || isnan(added_pt.x) || isnan(added_pt.y) ||
           isnan(added_pt.z))
         continue;
-
+      // 2.如果系统不给每个点的时间,统一扫描方式计算
       if (!given_offset_time) {
         int layer = pl_orig.points[i].ring;
         double yaw_angle = atan2(added_pt.y, added_pt.x) * 57.2957;
@@ -196,6 +210,9 @@ void Preprocess::process_cut_frame_pcl2(
           continue;
         }
         // compute offset time
+        // 点的偏移时间为:
+        // 1.激光雷达机械式,32根线同时扫描.
+        // 2.时间偏差原理:yaw_first - yaw_cur /扫描角速度
         if (yaw_angle <= yaw_fp[layer]) {
           added_pt.curvature = (yaw_fp[layer] - yaw_angle) / omega_l;
         } else {
@@ -337,6 +354,7 @@ void Preprocess::process_cut_frame_pcl2(
   if (scan_count < 20)
     required_cut_num = 1;
 
+  // 2.按时间片段分割成多个子点云,并通过pcl out输出
   PointCloudXYZI pcl_cut;
   for (uint i = 1; i < valid_pcl_size; i++) {
     valid_num++;

@@ -142,6 +142,7 @@ void Gril_Calib::downsample_interpolate_IMU(const double &move_start_time) {
                                IMU_state_group_ALL.end() - 1);
 
   // Mean filter to attenuate noise
+  // 均值滤波,平滑IMU加速度,减少噪声影响
   int mean_filt_size = 3;
   for (int i = mean_filt_size; i < IMU_state_group_ALL.size() - mean_filt_size;
        i++) {
@@ -153,6 +154,7 @@ void Gril_Calib::downsample_interpolate_IMU(const double &move_start_time) {
   }
 
   // Down-sample and interpolation，Fig.4 in the paper
+  // 将IMU得加速度和角速度在雷达对应时刻插值
   for (int i = 0; i < Lidar_state_group.size(); i++) {
     for (int j = 1; j < IMU_state_group_ALL.size(); j++) {
       if (IMU_state_group_ALL[j - 1].timeStamp <=
@@ -164,7 +166,7 @@ void Gril_Calib::downsample_interpolate_IMU(const double &move_start_time) {
         double delta_t_right =
             IMU_state_group_ALL[j].timeStamp - Lidar_state_group[i].timeStamp;
         double s = delta_t_right / delta_t;
-
+        //计算方法为:线型插值
         IMU_state_interpolation.ang_vel =
             s * IMU_state_group_ALL[j - 1].ang_vel +
             (1 - s) * IMU_state_group_ALL[j].ang_vel;
@@ -261,6 +263,7 @@ void Gril_Calib::IMU_time_compensate(const double &lag_time,
   if (is_discard) {
     // Discard first 10 Lidar estimations and corresponding IMU measurements due
     // to long time interval
+    // 初始得IMU测量和雷达估计一般都不太准,所以会丢掉初始得一些帧
     int i = 0;
     while (i < 10) {
       Lidar_state_group.pop_front();
@@ -421,6 +424,7 @@ void Gril_Calib::solve_Rotation_only() {
   ceres::Solve(options_quat, &problem_rot, &summary_quat);
   Eigen::Quaterniond q_LI(R_LI_quat[0], R_LI_quat[1], R_LI_quat[2],
                           R_LI_quat[3]);
+  // T_lidar_imu
   Rot_Lidar_wrt_IMU =
       q_LI.matrix(); // LiDAR angulr velocity in IMU frame (from LiDAR to IMU)
 }
@@ -494,19 +498,20 @@ void Gril_Calib::solve_Rot_Trans_calib(double &timediff_imu_wrt_lidar,
   for (int i = 0; i < IMU_state_group.size(); i++) {
     double deltaT =
         Lidar_state_group[i].timeStamp - IMU_state_group[i].timeStamp;
-
+    //地平面约束
     problem_Ex_calib.AddResidualBlock(
         Ground_Plane_Cost_IL::Create(
             Lidar_wrt_ground_group[i], IMU_wrt_ground_group[i],
             distance_Lidar_wrt_ground_group[i], imu_sensor_height),
         loss_function_plain_motion_scaled, R_IL_quat, Trans_IL);
 
+    //角速度约束
     problem_Ex_calib.AddResidualBlock(
         Angular_Vel_IL_Cost::Create(IMU_state_group[i].ang_vel,
                                     IMU_state_group[i].ang_acc,
                                     Lidar_state_group[i].ang_vel, deltaT),
         loss_function_angular_scaled, R_IL_quat, bias_g, &time_lag2);
-
+    //线加速度约束
     problem_Ex_calib.AddResidualBlock(
         Linear_acc_Rot_Cost_without_Gravity::Create(
             Lidar_state_group[i], IMU_state_group[i].linear_acc,
@@ -757,15 +762,17 @@ void Gril_Calib::LI_Calibration(int &orig_odom_freq, int &cut_frame_num,
                                 const double &move_start_time) {
 
   TimeConsuming time("Batch optimization");
-
+  // 1.IMU数据插值,获得雷达扫描时刻得IMU加速度和速度
   downsample_interpolate_IMU(move_start_time);
   fout_before_filter();
+  // 2.时间对齐和数量对齐
   IMU_time_compensate(0.0, true);
 
   deque<CalibState> IMU_after_zero_phase;
   deque<CalibState> Lidar_after_zero_phase;
   zero_phase_filt(get_IMU_state(),
                   IMU_after_zero_phase); // zero phase low-pass filter
+  //加速度去中心化
   normalize_acc(IMU_after_zero_phase);
   zero_phase_filt(get_Lidar_state(), Lidar_after_zero_phase);
   set_IMU_state(IMU_after_zero_phase);
@@ -786,6 +793,8 @@ void Gril_Calib::LI_Calibration(int &orig_odom_freq, int &cut_frame_num,
   fout_check_lidar(); // file output for visualizing lidar low pass filter
 
   solve_Rotation_only();
+
+  //加速度插值
   acc_interpolate();
   align_Group(IMU_state_group, Lidar_wrt_ground_group, IMU_wrt_ground_group,
               normal_vector_wrt_lidar_group, distance_Lidar_wrt_ground_group);
@@ -805,7 +814,7 @@ void Gril_Calib::LI_Calibration(int &orig_odom_freq, int &cut_frame_num,
   printf("" RESET);
 
   // For debug
-  // plot_result();
+  plot_result();
 }
 
 void Gril_Calib::print_calibration_result(double &time_L_I, M3D &R_L_I,

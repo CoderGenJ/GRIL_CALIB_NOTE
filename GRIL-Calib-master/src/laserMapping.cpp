@@ -467,10 +467,11 @@ void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) {
   if (lidar_type == VELO || lidar_type == VELO_NCLT || lidar_type == OUSTER ||
       lidar_type == PANDAR || lidar_type == VELO_without_Time) {
     pcl::fromROSMsg(*msg, curr_points);
-
+    // pcl::io::savePCDFileASCII("/home/eric/1/cur.pcd",curr_points);
+    // std::cout << "estimate_ground" << std::endl;
     PatchworkppGroundSeg->estimate_ground(curr_points, ground_points,
                                           non_ground_points, time_taken);
-
+    // pcl::io::savePCDFileASCII("/home/eric/1/ground.pcd",ground_points);
     pub_cloud.publish(cloud2msg(curr_points));
     pub_ground.publish(cloud2msg(ground_points));
     pub_non_ground.publish(cloud2msg(non_ground_points));
@@ -539,6 +540,9 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in,
   sig_buffer.notify_all();
 }
 
+//本函数是打包雷达相同扫描时间的IMU数据和点云数据.
+//方法: 确定激光雷达扫描的起始结束时间,然后在IMU
+// buffer中找到对应时间段数据,一同放出measuregroud输出.
 bool sync_packages(MeasureGroup &meas) {
   if (lidar_buffer.empty() || imu_buffer.empty())
     return false;
@@ -852,6 +856,9 @@ void saveTrajectory(const std::string &traj_file) {
  * @output : quaternion (from world gravity frame to LiDAR plane frame)
  * @output : estimated height of LiDAR sensor
  */
+// normal_vector:就是 0 , 0 , 1
+// lidar_q: T_world_lidar
+// lidar_estimate_height:
 void get_quat_LiDAR_plane_to_gravity(Eigen::Quaterniond &lidar_q,
                                      V3D &normal_vector,
                                      double &lidar_estimate_height) {
@@ -1094,6 +1101,9 @@ int main(int argc, char **argv) {
       kdtree_search_time = 0.0;
 
       /** IMU pre-processing **/
+      //这个函数只要是IMU初始化,以及propagation_and_undist(被注释)
+      //去畸变,但是这个函数被注释了.
+      //初始化完成后,进行Forward_propagation_without_imu
       p_imu->Process(Measures, state, feats_undistort);
       state_propagat = state;
 
